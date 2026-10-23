@@ -34,6 +34,17 @@ public class ClienteController {
         return clienteService.salvar(cliente);
     }
 
+    @PutMapping("/{id}")
+    public ResponseEntity<Cliente> atualizar(@PathVariable Long id, @RequestBody Cliente clienteAtualizado) {
+        return clienteService.buscarPorId(id)
+                .map(clienteExistente -> {
+                    clienteAtualizado.setId(id); // Garante que o ID do path será mantido
+                    Cliente salvo = clienteService.salvar(clienteAtualizado);
+                    return ResponseEntity.ok(salvo);
+                })
+                .orElse(ResponseEntity.notFound().build());
+    }
+
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deletar(@PathVariable Long id) {
         if (clienteService.buscarPorId(id).isEmpty()) {
