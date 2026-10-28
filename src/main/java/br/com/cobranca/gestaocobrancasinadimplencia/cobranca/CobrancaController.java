@@ -1,5 +1,10 @@
 package br.com.cobranca.gestaocobrancasinadimplencia.cobranca;
 
+import br.com.cobranca.gestaocobrancasinadimplencia.cliente.Cliente;
+import br.com.cobranca.gestaocobrancasinadimplencia.cliente.ClienteRepository;
+import br.com.cobranca.gestaocobrancasinadimplencia.cobranca.dto.CobrancaRequestDTO;
+import br.com.cobranca.gestaocobrancasinadimplencia.cobranca.dto.CobrancaResponseDTO;
+import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -10,36 +15,68 @@ import java.util.List;
 @RequestMapping("/api/cobrancas")
 public class CobrancaController {
 
-    private final CobrancaService cobrancaService;
+    private final CobrancaRepository cobrancaRepository;
+    private final ClienteRepository clienteRepository;
 
-    public CobrancaController(CobrancaService cobrancaService) {
-        this.cobrancaService = cobrancaService;
-    }
-
-    @GetMapping
-    public List<Cobranca> listar() {
-        return cobrancaService.listar();
-    }
-
-    @GetMapping("/{id}")
-    public ResponseEntity<Cobranca> buscarPorId(@PathVariable Long id) {
-        return cobrancaService.buscarPorId(id)
-                .map(ResponseEntity::ok)
-                .orElse(ResponseEntity.notFound().build());
+    public CobrancaController(CobrancaRepository cobrancaRepository, ClienteRepository clienteRepository) {
+        this.cobrancaRepository = cobrancaRepository;
+        this.clienteRepository = clienteRepository;
     }
 
     @PostMapping
-    @ResponseStatus(HttpStatus.CREATED)
-    public Cobranca criar(@RequestBody Cobranca cobranca) {
-        return cobrancaService.salvar(cobranca);
+    public ResponseEntity<CobrancaResponseDTO> cadastrar(@RequestBody @Valid CobrancaRequestDTO dto) {
+        Cliente cliente = clienteRepository.findById(dto.clienteId())
+                .orElseThrow(() -> new RuntimeException("Cliente não encontrado com o ID: " + dto.clienteId()));
+
+        Cobranca cobranca = new Cobranca();
+        cobranca.setCliente(cliente);
+        cobranca.setValor(dto.valor());
+        cobranca.setDataVencimento(dto.dataVencimento());
+        cobranca.setStatus("PENDENTE");
+
+        Cobranca cobrancaSalva = cobrancaRepository.save(cobranca);
+        return ResponseEntity.status(HttpStatus.CREATED).body(CobrancaResponseDTO.fromEntity(cobrancaSalva));
+    }
+
+    @GetMapping
+    public ResponseEntity<List<CobrancaResponseDTO>> listarTodas() {
+        List<CobrancaResponseDTO> cobrancas = cobrancaRepository.findAll()
+                .stream()
+                .map(CobrancaResponseDTO::fromEntity)
+                .toList();
+        return ResponseEntity.ok(cobrancas);
+    }
+
+    @GetMapping("/{id}")
+    public ResponseEntity<CobrancaResponseDTO> buscarPorId(@PathVariable Long id) {
+        return cobrancaRepository.findById(id)
+                .map(cobranca -> ResponseEntity.ok(CobrancaResponseDTO.fromEntity(cobranca)))
+                .orElse(ResponseEntity.notFound().build());
+    }
+
+    @PutMapping("/{id}")
+    public ResponseEntity<CobrancaResponseDTO> atualizar(@PathVariable Long id, @RequestBody @Valid CobrancaRequestDTO dto) {
+        return cobrancaRepository.findById(id)
+                .map(cobranca -> {
+                    Cliente cliente = clienteRepository.findById(dto.clienteId())
+                            .orElseThrow(() -> new RuntimeException("Cliente não encontrado com o ID: " + dto.clienteId()));
+
+                    cobranca.setCliente(cliente);
+                    cobranca.setValor(dto.valor());
+                    cobranca.setDataVencimento(dto.dataVencimento());
+
+                    Cobranca atualizada = cobrancaRepository.save(cobranca);
+                    return ResponseEntity.ok(CobrancaResponseDTO.fromEntity(atualizada));
+                })
+                .orElse(ResponseEntity.notFound().build());
     }
 
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deletar(@PathVariable Long id) {
-        if (cobrancaService.buscarPorId(id).isEmpty()) {
+        if (!cobrancaRepository.existsById(id)) {
             return ResponseEntity.notFound().build();
         }
-        cobrancaService.deletar(id);
+        cobrancaRepository.deleteById(id);
         return ResponseEntity.noContent().build();
     }
 }
