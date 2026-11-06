@@ -17,10 +17,14 @@ public class CobrancaController {
 
     private final CobrancaRepository cobrancaRepository;
     private final ClienteRepository clienteRepository;
+    private final CobrancaService cobrancaService;
 
-    public CobrancaController(CobrancaRepository cobrancaRepository, ClienteRepository clienteRepository) {
+    public CobrancaController(CobrancaRepository cobrancaRepository, 
+                              ClienteRepository clienteRepository, 
+                              CobrancaService cobrancaService) {
         this.cobrancaRepository = cobrancaRepository;
         this.clienteRepository = clienteRepository;
+        this.cobrancaService = cobrancaService;
     }
 
     @PostMapping
@@ -64,8 +68,13 @@ public class CobrancaController {
                     cobranca.setCliente(cliente);
                     cobranca.setValor(dto.valor());
                     cobranca.setDataVencimento(dto.dataVencimento());
+                    cobranca.setStatus(dto.status());
+                    
+                    // Opcional: caso queira permitir atualizar o status enviando por DTO ou definir padrão
+                    // cobranca.setStatus("PAGO"); // Se o seu DTO tiver status, você pode pegar de lá.
 
-                    Cobranca atualizada = cobrancaRepository.save(cobranca);
+                    // Passa pelo Service para executar a lógica de cálculo de juros/multa e status "PAGO"
+                    Cobranca atualizada = cobrancaService.salvar(cobranca);
                     return ResponseEntity.ok(CobrancaResponseDTO.fromEntity(atualizada));
                 })
                 .orElse(ResponseEntity.notFound().build());
